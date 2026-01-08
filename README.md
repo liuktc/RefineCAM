@@ -62,6 +62,6 @@ If you want to run experiments on different models or datasets, you can modify t
 
 ## License
 
-This project is licensed under the MIT License – see the [LICENSE](https://github.com/liuktc/RefineCAM/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License – see the [LICENSE](https://github.com/liuktc/RefineCAM/blob/master/LICENSE) file for details.
 
 You are free to use, modify, and distribute this code. If you use it for research, please cite the original paper.
