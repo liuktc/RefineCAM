@@ -1,0 +1,29 @@
+model: swin
+# dataset: imagenettewoof
+dataset: synthetic
+# dataset: imagenet
+attribution_methods:
+  # - GradCAMPlusPlus
+  # - LayerCAM
+  # - ScoreCAM
+  - RandomCAM
+  # - All1sCAM
+  # - HalfCAM
+metrics:
+  - road_combined
+  - deletioncurveauc
+  - insertioncurveauc
+  - infidelity
+  - averagedrop
+  - coherency
+  - complexity
+  # - roc_auc
+  - mass_iou
+upscale_methods:
+  - SimpleUpsampling
+  # - ERFUpsamplingFast
+
+model_path: ./models/weights/swin_synthetic.pt
+output_path: ./results_swin_trivial.csv
+device: cuda:0
+num_samples: 100

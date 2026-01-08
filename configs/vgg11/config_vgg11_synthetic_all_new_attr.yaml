@@ -1,0 +1,46 @@
+model: vgg11
+# dataset: imagenettewoof
+dataset: synthetic_all
+attribution_methods:
+  # - GradCAMPlusPlus
+  # - LayerCAM
+  # - ScoreCAM
+  # - RandomCAM
+  # - All1sCAM
+  # - HalfCAM
+  - IntegratedGradients
+  - InputXGradient
+  - Lime
+  - KernelShap
+  - LRP
+  - GuidedGradCam
+metrics:
+  - road_combined
+  # - deletioncurveauc
+  # - insertioncurveauc
+  # - infidelity
+  - averagedrop
+  - coherency
+  - complexity
+  - roc_auc
+  - mass_iou
+  - bce
+  - l2masknorm
+  - CosineSimilarity
+  # - FunnyBirds # Computes all FunnyBirds metrics
+upscale_methods:
+  - SimpleUpsampling
+  # - ERFUpsamplingFast
+mixing_methods:
+  - IdentityMix
+  # - MultiplierMix
+  # - LogExpMix
+  # - NthRootMultiplierMix
+  # - ExpMeanMix
+
+model_path: ./models/weights/VGG11_Synthetic_All.pt
+output_path: ./results_vgg11_synth_all.csv
+device: cuda:0
+# num_samples: 1
+only_final_layer: True
+

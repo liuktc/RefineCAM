@@ -1,0 +1,26 @@
+model: vgg11
+# dataset: imagenettewoof
+dataset: synthetic
+# dataset: imagenet
+attribution_methods:
+  - GradCAMPlusPlus
+  - LayerCAM
+  - ScoreCAM
+metrics:
+  - road_combined
+  - deletioncurveauc
+  - insertioncurveauc
+  - infidelity
+  - averagedrop
+  - coherency
+  - complexity
+  - roc_auc
+  - mass_iou
+upscale_methods:
+  - SimpleUpsampling
+  # - ERFUpsamplingFast
+
+model_path: ./models/weights/VGG11_Synthetic.pt
+output_path: ./results_vgg11_synthetic.csv
+device: cuda:0
+# num_samples: 1000

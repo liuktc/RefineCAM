@@ -1,0 +1,49 @@
+model: convnext_tiny
+# dataset: imagenettewoof
+# dataset: synthetic
+dataset: synthetic_all
+attribution_methods:
+  - GradCAMPlusPlus
+  - LayerCAM
+  - ScoreCAM
+  # - RandomCAM
+  # - All1sCAM
+  # - HalfCAM
+  - IntegratedGradients
+  - InputXGradient
+  - Lime
+  - KernelShap
+  # - LRP
+  - GuidedGradCam
+metrics:
+  - road_combined
+  # - deletioncurveauc
+  # - insertioncurveauc
+  # - infidelity
+  - averagedrop
+  - coherency
+  - complexity
+  # - roc_auc
+  # - mass_iou
+  # - bce
+  # - l2masknorm
+  - CosineSimilarity
+  # - FunnyBirds # Computes all FunnyBirds metrics
+upscale_methods:
+  - SimpleUpsampling
+  # - ERFUpsamplingFast
+mixing_methods:
+  - IdentityMix
+  # - MultiplierMix
+  # - LogExpSum
+  # - NthRoot
+
+model_path: ./models/weights/Convnext_tiny_Synthetic_All.pth
+output_path: ./results_convnext_tiny_synthetic_all.csv
+device: cuda:0
+# num_samples: 1000
+# plotting: True 
+only_final_layer: True
+
+
+diffusion_curves: True

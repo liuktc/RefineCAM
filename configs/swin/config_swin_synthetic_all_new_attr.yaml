@@ -1,0 +1,41 @@
+model: swin
+dataset: synthetic_all
+# dataset: imagenet
+# dataset: synthetic_all
+attribution_methods:
+  # - GradCAMPlusPlus
+  # - LayerCAM
+  # - ScoreCAM
+  # # - RandomCAM
+  # # - All1sCAM
+  # # - HalfCAM
+  - IntegratedGradients
+  - InputXGradient
+  - Lime
+  - KernelShap
+  # - LRP
+  - GuidedGradCam
+metrics:
+  - road_combined
+  # - deletioncurveauc
+  # - insertioncurveauc
+  # - infidelity
+  - averagedrop
+  - coherency
+  - complexity
+  - roc_auc
+  - mass_iou
+  - bce
+  - l2masknorm
+  - CosineSimilarity
+  # - FunnyBirds # Computes all FunnyBirds metrics
+upscale_methods:
+  - SimpleUpsampling
+  # - ERFUpsamplingFast
+
+model_path: ./models/weights/Swin_Synthetic_All.pt
+output_path: ./results_swin_synth_all.csv
+device: cuda:1
+# num_samples: 1
+only_final_layer: True
+# plotting: True
