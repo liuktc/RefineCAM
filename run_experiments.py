@@ -1,127 +1,116 @@
-import yaml
-import torch
-import numpy as np
-import torchvision.transforms as transforms
-from torchvision.transforms import InterpolationMode
-from torch.utils.data import DataLoader, Subset
-import logging  # Logging added
-import colorlog
-# Import your modules
-from utils import (
-    _GradCAMPlusPlus,
-    _ShapleyCAM,
-    _ScoreCAM,
-    _EigenCAM,
-    _LayerCAM,
-    _RandomCAM,
-    _All1sCAM,
-    _HalfCAM,
-    SimpleUpsampling,
-    ERFUpsamplingFast,
-    min_max_normalize,
-    MultiplierMix,
-    IdentityMix,
-    NthRootMultiplierMix,
-    LogExpMix,
-    ExpMeanMix,
-    CaptumDeepLift,
-    CaptumIntegratedGradients,
-    CaptumInputXGradient,
-    CaptumLime,
-    CaptumKernelShap,
-    CaptumLRP,
-    CaptumGuidedGradCam
-)
-from data import imagenettewoof, SynteticFigures, Binarize, imagenet, SyntheticFiguresSmall, SyntheticFiguresAll, FunnyBirds, FunnyBirdsSubset
+import argparse
+import logging
+import os
+from functools import partial
 
-from results.results_metrics import ResultMetrics
+import colorlog
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+import yaml
+from tqdm.auto import tqdm
+
+from data import (
+    FunnyBirds,
+    FunnyBirdsSubset,
+    SyntheticFiguresAll,
+    imagenet,
+)
 from metrics import (
+    BCE,
     ROC_AUC,
-    DeletionCurveAUC,
-    InsertionCurveAUC,
-    Infidelity,
+    Accuracy,
     AverageDrop,
+    BackgroundIndependence,
     Coherency,
     Complexity,
-    RoadCombined,
-    Mass_IOU,
-    BCE,
-    L2MaskNorm,
-    CosineSimilarity,
-    Accuracy,
     ControlledSyntheticDataCheck,
-    SingleDeletion,
-    PreservationCheck,
+    CosineSimilarity,
     DeletionCheck,
-    TargetSensitivity,
-    Sensitivity,
+    DeletionCurveAUC,
     Distractibility,
-    BackgroundIndependence,
-    DiffusionCurves
+    Infidelity,
+    InsertionCurveAUC,
+    L2MaskNorm,
+    Mass_IOU,
+    PreservationCheck,
+    RoadCombined,
+    SingleDeletion,
+    TargetSensitivity,
 )
 from models import (
-    vgg11_Imagenettewoof,
-    vgg11_Synthetic,
-    vgg11_Imagenet,
-    vgg11_Synthetic_Small,
-    vgg11_Funnybirds,
-    vgg_preprocess,
-    resnet18_Imagenettewoof,
-    resnet50_Imagenettewoof,
-    resnet18_Synthetic,
-    resnet50_Synthetic,
-    resnet18_Synthetic_Small,
-    resnet50_Synthetic_Small,
-    resnet18_Imagenet,
-    resnet50_Imagenet,
-    resnet18_Funnybirds,
-    resnet50_Funnybirds,
-    resnet_preprocess,
-    vit_imagenet,
-    vit_imagenettewoof,
-    vit_PascalVOC,
-    vit_Synthetic,
-    vit_preprocess,
-    swin_imagenettewoof,
-    swin_imagenet,
-    swin_PascalVOC,
-    swin_Synthetic,
-    swin_Synthetic_Small,
-    swin_Funnybirds,
-    swin_preprocess,
-    convnext_small_Synthetic,
-    convnext_small_Imagenet,
-    convnext_tiny_Synthetic,
-    convnext_tiny_Imagenet,
-    convnext_tiny_Funnybirds,
     convnext_preprocess,
+    convnext_small_Imagenet,
+    convnext_small_Synthetic,
+    convnext_tiny_Funnybirds,
+    convnext_tiny_Imagenet,
+    convnext_tiny_Synthetic,
+    resnet18_Funnybirds,
+    resnet18_Imagenet,
+    resnet18_Synthetic,
+    resnet50_Funnybirds,
+    resnet50_Imagenet,
+    resnet50_Synthetic,
+    resnet_preprocess,
+    swin_Funnybirds,
+    swin_imagenet,
+    swin_preprocess,
+    swin_Synthetic,
+    vgg11_Funnybirds,
+    vgg11_Imagenet,
+    vgg11_Synthetic,
+    vgg_preprocess,
+    vit_imagenet,
+    vit_preprocess,
+    vit_Synthetic,
+)
+from results.results_metrics import ResultMetrics
+from utils import (
+    CaptumDeepLift,
+    CaptumGuidedGradCam,
+    CaptumInputXGradient,
+    CaptumIntegratedGradients,
+    CaptumKernelShap,
+    CaptumLime,
+    CaptumLRP,
+    ERFUpsamplingFast,
+    ExpMeanMix,
+    IdentityMix,
+    LogExpMix,
+    MultiplierMix,
+    NthRootMultiplierMix,
+    SimpleUpsampling,
+    _All1sCAM,
+    _EigenCAM,
+    _GradCAMPlusPlus,
+    _HalfCAM,
+    _LayerCAM,
+    _RandomCAM,
+    _ScoreCAM,
+    _ShapleyCAM,
+    min_max_normalize,
 )
 
-import argparse
-from tqdm.auto import tqdm
+# Dataset root paths - can be overridden via environment variables
+IMAGENET_ROOT = os.environ.get("IMAGENET_ROOT", "./data/imagenet")
+FUNNYBIRDS_ROOT = os.environ.get("FUNNYBIRDS_ROOT", "./data/funnybirds/FunnyBirds")
 
 logging.root.handlers = []  # Remove all root handlers
 logging.basicConfig(handlers=[], force=True)  # Override any basicConfig
 
 formatter = colorlog.ColoredFormatter(
-    '%(log_color)s%(levelname)s:%(reset)s %(message)s',
+    "%(log_color)s%(levelname)s:%(reset)s %(message)s",
     log_colors={
-        'INFO': 'green',
-        'WARNING': 'yellow',
-        'ERROR': 'red',
-    }
+        "INFO": "green",
+        "WARNING": "yellow",
+        "ERROR": "red",
+    },
 )
 
-# Setup logging
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format="%(asctime)s - %(levelname)s - %(message)s",
-#     handlers=[logging.FileHandler("evaluation.log"), logging.StreamHandler()],
-# )
 logging.getLogger().handlers = []
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-logger.propagate = False 
+logger.propagate = False
 
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
@@ -129,7 +118,6 @@ logger.addHandler(handler)
 
 
 logger.info("Starting program and setting up environment.")
-
 
 
 # Read the config filename from command line arguments
@@ -185,8 +173,20 @@ logger.info("Loaded and processed configuration from config.yaml")
 # CONSTANTS
 ##################################################
 
-MODELS = ["vgg11", "resnet18", "resnet50", "vit", "swin", "convnext_tiny", "convnext_small"]
-DATASETS = ["imagenettewoof", "synthetic", "synthetic_small","synthetic_all", "imagenet", "funnybirds"]
+MODELS = [
+    "vgg11",
+    "resnet18",
+    "resnet50",
+    "vit",
+    "swin",
+    "convnext_tiny",
+    "convnext_small",
+]
+DATASETS = [
+    "synthetic",
+    "imagenet",
+    "funnybirds",
+]
 ATTRIBUTION_METHODS = [
     "GradCAMPlusPlus",
     "ShapleyCAM",
@@ -202,7 +202,7 @@ ATTRIBUTION_METHODS = [
     "Lime",
     "KernelShap",
     "LRP",
-    "GuidedGradCam"
+    "GuidedGradCam",
 ]
 UPSCALE_METHODS = ["SimpleUpsampling", "ERFUpsamplingFast"]
 METRICS = [
@@ -214,20 +214,19 @@ METRICS = [
     "AverageDrop",
     "Coherency",
     "Complexity",
-    "Mass_IOU",	
+    "Mass_IOU",
     "BCE",
     "L2MaskNorm",
     "CosineSimilarity",
-    "FunnyBirds"
+    "FunnyBirds",
 ]
 MIXING_METHODS = [
     "IdentityMix",
     "MultiplierMix",
     "NthRootMultiplierMix",
     "LogExpMix",
-    "ExpMeanMix"
+    "ExpMeanMix",
 ]
-# LAYERS = [4,3,2,1]
 
 # Convert all the constant lists to lowercase
 MODELS = [m.lower() for m in MODELS]
@@ -271,17 +270,7 @@ logger.info(
 # MODEL
 #################################################
 
-if config["dataset"] == "imagenettewoof":
-    models_map = {
-        "vgg11": vgg11_Imagenettewoof,
-        "resnet18": resnet18_Imagenettewoof,
-        "resnet50": resnet50_Imagenettewoof,
-        "vit": vit_imagenettewoof,
-        "swin": swin_imagenettewoof,
-        "convnext_tiny": None,
-        "convnext_small": None,
-    }
-elif config["dataset"] == "synthetic" or config["dataset"] == "synthetic_all":
+if config["dataset"] == "synthetic":
     models_map = {
         "vgg11": vgg11_Synthetic,
         "resnet18": resnet18_Synthetic,
@@ -301,16 +290,6 @@ elif config["dataset"] == "imagenet":
         "convnext_tiny": convnext_tiny_Imagenet,
         "convnext_small": convnext_small_Imagenet,
     }
-elif config["dataset"] == "synthetic_small":
-    models_map = {
-        "vgg11": vgg11_Synthetic_Small,
-        "resnet18": resnet18_Synthetic_Small,
-        "resnet50": resnet50_Synthetic_Small,
-        "vit": None,  # Assuming vit is used for PascalVOC in small dataset
-        "swin": swin_Synthetic_Small,
-        "convnext_tiny": None,
-        "convnext_small": None,
-    }
 elif config["dataset"] == "funnybirds":
     models_map = {
         "vgg11": vgg11_Funnybirds,
@@ -324,6 +303,7 @@ elif config["dataset"] == "funnybirds":
 else:
     raise ValueError(f"Dataset {config['dataset']} not supported.")
 
+
 model = models_map[config["model"]]()
 model.to(device)
 model.eval()
@@ -332,7 +312,9 @@ model.eval()
 logger.info(f"Model '{config['model']}' initialized.")
 if "model_path" in config and config["model_path"]:
     if config["model_path"].endswith(".tar"):
-        model.load_state_dict(torch.load(config["model_path"], map_location=device)['state_dict'])
+        model.load_state_dict(
+            torch.load(config["model_path"], map_location=device)["state_dict"]
+        )
     else:
         model.load_state_dict(torch.load(config["model_path"], map_location=device))
     logger.info(f"Model weights loaded from {config['model_path']}.")
@@ -355,71 +337,9 @@ preprocess = preprocess_map[config["model"]]
 # DATASET
 ###############################################
 
-if config["dataset"] == "imagenettewoof":
-    test_data = imagenettewoof(
-        split="test", size="320px", download=False, transform=preprocess
-    )
+if config["dataset"] == "imagenet":
+    test_data = imagenet(root=IMAGENET_ROOT, split="val", transform=preprocess)
 elif config["dataset"] == "synthetic":
-    TRAIN_SIZE = 8
-    TEST_SIZE = 6 * 100
-    background_transform = transforms.Compose(
-        [
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
-            transforms.ColorJitter(
-                brightness=0.25, contrast=0.15, saturation=0.15, hue=0.15
-            ),
-        ]
-    )
-    mask_preprocess = transforms.Compose(
-        [
-            transforms.Resize((224, 224), interpolation=InterpolationMode.NEAREST),
-            transforms.GaussianBlur(kernel_size=3),
-            transforms.ToTensor(),
-            Binarize(),
-        ]
-    )
-    test_data = SynteticFigures(
-        background_path="./data/WaldoNoise",
-        num_images=TEST_SIZE,
-        split="test",
-        num_shapes_per_image=1,
-        image_transform=preprocess,
-        background_transform=background_transform,
-        mask_preprocess=mask_preprocess,
-        size_ranges=(80, 100),
-    )
-elif config["dataset"] == "imagenet":
-    test_data = imagenet(root="/media/data/ldomeniconi/imagenet_root", split="val", transform=preprocess)
-elif config["dataset"] == "synthetic_small":
-    TRAIN_SIZE = 8
-    TEST_SIZE = 6 * 100
-    background_transform = transforms.Compose(
-        [
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomVerticalFlip(),
-            transforms.ColorJitter(
-                brightness=0.25, contrast=0.15, saturation=0.15, hue=0.15
-            ),
-        ]
-    )
-    mask_preprocess = transforms.Compose(
-        [
-            transforms.Resize((224, 224), interpolation=InterpolationMode.NEAREST),
-            transforms.GaussianBlur(kernel_size=1),
-            transforms.ToTensor(),
-            Binarize(),
-        ]
-    )
-    test_data = SyntheticFiguresSmall(
-        background_path="./data/WaldoNoise_test",
-        num_images=TEST_SIZE,
-        split="test",
-        image_transform=preprocess,
-        background_transform=background_transform,
-        mask_preprocess=mask_preprocess,
-    )
-elif config["dataset"] == "synthetic_all":
     TEST_SIZE = 6 * 100
 
     test_data = SyntheticFiguresAll(
@@ -427,10 +347,10 @@ elif config["dataset"] == "synthetic_all":
         num_images=TEST_SIZE,
         split="test",
         image_transform=preprocess,
-        image_size=(224,224),
+        image_size=(224, 224),
     )
 elif config["dataset"] == "funnybirds":
-    test_data = FunnyBirds("/media/data/ldomeniconi/funnybirds/FunnyBirds", "test", get_part_map=True, transform=None)
+    test_data = FunnyBirds(FUNNYBIRDS_ROOT, "test", get_part_map=True, transform=None)
 else:
     raise ValueError(f"Dataset {config['dataset']} not supported.")
 logger.info(f"Dataset '{config['dataset']}' loaded with {len(test_data)} samples.")
@@ -455,22 +375,29 @@ attr_methods_map = {
     "lime": CaptumLime,
     "kernelshap": CaptumKernelShap,
     "lrp": CaptumLRP,
-    "guidedgradcam": CaptumGuidedGradCam
+    "guidedgradcam": CaptumGuidedGradCam,
 }
 attr_methods = [attr_methods_map[m]() for m in config["attribution_methods"]]
 logger.info(f"Attribution methods initialized: {config['attribution_methods']}")
 
 # Upscale methods
 upscale_map = {
-    "simpleupsampling": lambda: SimpleUpsampling((256, 256) if config["dataset"] == "funnybirds" else (224, 224)),
+    "simpleupsampling": lambda: SimpleUpsampling(
+        (256, 256) if config["dataset"] == "funnybirds" else (224, 224)
+    ),
     "erupsamplingfast": ERFUpsamplingFast,
 }
 upscale_methods = [upscale_map[m]() for m in config["upscale_methods"]]
 logger.info(f"Upscale methods initialized: {config['upscale_methods']}")
 
 # ConvNext and LRP are not compatible
-if config["model"] in ["convnext_tiny", "convnext_small"] and "lrp" in config["attribution_methods"]:
-    logger.error("LRP is not compatible with ConvNext models. Please remove LRP from attribution methods.")
+if (
+    config["model"] in ["convnext_tiny", "convnext_small"]
+    and "lrp" in config["attribution_methods"]
+):
+    logger.error(
+        "LRP is not compatible with ConvNext models. Please remove LRP from attribution methods."
+    )
     exit(1)
 
 
@@ -519,16 +446,14 @@ metrics.extend([metric_map[m]() for m in config["metrics"]])
 if any(
     m in config["metrics"]
     for m in [
-        "roc_auc"
+        "roc_auc",
         "mass_iou",
         "bce",
         "l2masknorm",
         "cosinesimilarity",
     ]
 ) and config["dataset"] not in ["synthetic", "synthetic_small", "synthetic_all"]:
-    logger.error(
-        "GT-based metrics can only be used with Synthetic datasets."
-    )
+    logger.error("GT-based metrics can only be used with Synthetic datasets.")
     exit(1)
 
 logger.info(f"Evaluation metrics initialized: {config['metrics']}")
@@ -554,11 +479,26 @@ elif config["model"] == "resnet18":
 elif config["model"] == "resnet50":
     layers = [model.layer4, model.layer3, model.layer2, model.layer1]
 elif config["model"] == "vit":
-    layers = [model.blocks[11].norm1, model.blocks[10].norm1, model.blocks[9].norm1, model.blocks[8].norm1]
+    layers = [
+        model.blocks[11].norm1,
+        model.blocks[10].norm1,
+        model.blocks[9].norm1,
+        model.blocks[8].norm1,
+    ]
 elif config["model"] == "swin":
-    layers = [model.layers[3].blocks[-1].norm1, model.layers[2].blocks[-1].norm1, model.layers[1].blocks[-1].norm1, model.layers[0].blocks[-1].norm1]
+    layers = [
+        model.layers[3].blocks[-1].norm1,
+        model.layers[2].blocks[-1].norm1,
+        model.layers[1].blocks[-1].norm1,
+        model.layers[0].blocks[-1].norm1,
+    ]
 elif config["model"] == "convnext_tiny" or config["model"] == "convnext_small":
-    layers = [model.features[-1][-1], model.features[-3][-1], model.features[-5][-1], model.features[-7][-1]]
+    layers = [
+        model.features[-1][-1],
+        model.features[-3][-1],
+        model.features[-5][-1],
+        model.features[-7][-1],
+    ]
 else:
     raise ValueError(f"Model {config['model']} not supported.")
 layers_names_map = {
@@ -583,7 +523,6 @@ if config.get("only_final_layer", False):
 #     exit(1)
 
 
-
 #######################################
 # NUM_SAMPLES
 #######################################
@@ -596,12 +535,11 @@ if "num_samples" in config:
         )
     # test_data = torch.utils.data.Subset(test_data, range(num_samples))
     logger.info(f"Using {num_samples} samples for evaluation.")
-    INDICES = np.random.choice(
-        len(test_data), num_samples, replace=False
-    )
+    INDICES = np.random.choice(len(test_data), num_samples, replace=False)
 else:
     INDICES = np.arange(len(test_data))
     logger.info(f"Using all {len(test_data)} samples for evaluation.")
+
 
 ##########################################
 # RESHAPE FUNCTION
@@ -609,23 +547,22 @@ else:
 def reshape_transform(tensor, token_to_remove=0):
     if tensor.size(0) != 1 and tensor.dim() == 3:
         tensor = tensor.unsqueeze(1)
-    
+
     if tensor.dim() == 4:
         result = tensor.transpose(2, 3).transpose(1, 2)
         return result
-    
+
     tensor = tensor[:, token_to_remove:]
     num_elements = tensor.numel()
-    height = int((num_elements/tensor.size(2)) ** 0.5)
+    height = int((num_elements / tensor.size(2)) ** 0.5)
     width = height
-    result = tensor.reshape(tensor.size(0),
-                            height, width, tensor.size(2))
+    result = tensor.reshape(tensor.size(0), height, width, tensor.size(2))
 
     # Bring the channels to the first dimension, like in CNNs.
     result = result.transpose(2, 3).transpose(1, 2)
     return result
 
-from functools import partial
+
 if config["model"] == "vit":
     reshape = partial(reshape_transform, token_to_remove=1)
 elif config["model"] == "swin":
@@ -652,29 +589,22 @@ if len(mixing_methods) == 0:
     logger.info("No mixing methods specified. Defaulting to IdentityMix.")
 
 #########################################
-# DIFFUSION CURVES
-#########################################
-
-if config.get("diffusion_curves", False):
-    diffusion_curves = DiffusionCurves()
-else:
-    diffusion_curves = None
-
-#########################################
 # MAIN LOOP
 #########################################
 
 results = ResultMetrics(config["output_path"])
 for index in tqdm(INDICES):
     if config["dataset"] == "funnybirds":
-        funnybirds_test_dataset = FunnyBirdsSubset([index], "/media/data/ldomeniconi/funnybirds/FunnyBirds", "test", get_part_map=True, transform=None)
+        funnybirds_test_dataset = FunnyBirdsSubset(
+            [index], FUNNYBIRDS_ROOT, "test", get_part_map=True, transform=None
+        )
     else:
         funnybirds_test_dataset = None
 
     sample = test_data[index]
-    if type(sample) == dict:
-        images = sample['image'].to(device)
-        labels = torch.tensor([sample['class_idx']], dtype=torch.long).to(device)
+    if type(sample) is dict:
+        images = sample["image"].to(device)
+        labels = torch.tensor([sample["class_idx"]], dtype=torch.long).to(device)
         mask = None
     elif len(sample) == 2:
         images, labels = sample
@@ -688,33 +618,11 @@ for index in tqdm(INDICES):
     pred_label = model(images).argmax(dim=1)
 
     if labels.item() != pred_label.item():
-        logger.warning(f"Skipping index {index} as it is not correctly classified. True label: {labels.item()}, Predicted label: {pred_label.item()}")
+        logger.warning(
+            f"Skipping index {index} as it is not correctly classified. True label: {labels.item()}, Predicted label: {pred_label.item()}"
+        )
         continue
 
-    if diffusion_curves:
-        # Compute the diffusion curves
-        curves = diffusion_curves.compute_curves(
-            test_images=images,
-            saliency_maps=mask,
-            metrics=metrics,
-            device=device,
-            n=20,
-            model=model,
-            class_idx=labels,
-            # attribution_method=attr,
-            # layer=layer,
-            # upsample_method=upsampler,
-            # mixer=mixing_method,
-            # previous_attributions=layer_attributions[:-1],
-            mask=mask,
-            reshape_transform=reshape,
-            # explainer=attr,
-            test_dataset=funnybirds_test_dataset,
-        )
-        print(curves)
-        exit(0)
-
-    
     for attr in attr_methods:
         try:
             for upsampler in upscale_methods:
@@ -724,20 +632,24 @@ for index in tqdm(INDICES):
 
                     # Suppress Captum UserWarnings
                     warnings.filterwarnings("ignore", category=UserWarning)
-                    attr_map = attr.attribute(input_tensor= images,
-                                                model=model,
-                                                layer=layer,
-                                                target=labels,
-                                                reshape_transform=reshape)
-                    
+                    attr_map = attr.attribute(
+                        input_tensor=images,
+                        model=model,
+                        layer=layer,
+                        target=labels,
+                        reshape_transform=reshape,
+                    )
+
                     # If the attribution map is float64, convert to float32
                     if attr_map.dtype == torch.float64:
                         attr_map = attr_map.float()
-                    attr_map = upsampler(attribution=attr_map,
-                                        image=images,
-                                        device=device,
-                                        model=model,
-                                        layer=layer)
+                    attr_map = upsampler(
+                        attribution=attr_map,
+                        image=images,
+                        device=device,
+                        model=model,
+                        layer=layer,
+                    )
 
                     if (
                         torch.abs(
@@ -756,17 +668,18 @@ for index in tqdm(INDICES):
 
                     attr_map = min_max_normalize(attr_map)
                     if config.get("plotting", False):
-                        import matplotlib.pyplot as plt
                         plt.figure(figsize=(8, 8))
                         plt.subplot(1, 2, 1)
                         plt.title("Image")
-                        plt.axis('off')
+                        plt.axis("off")
                         plt.imshow(images[0].permute(1, 2, 0).cpu().detach().numpy())
                         plt.subplot(1, 2, 2)
                         plt.title(f"Attribution - {attr.name}")
                         plt.imshow(attr_map[0, 0].cpu().detach().numpy())
                         # plt.show()
-                        plt.savefig(f"attribution_{config['model']}_{config['dataset']}_{attr.name}_img{index}_{layer_name}.png")
+                        plt.savefig(
+                            f"attribution_{config['model']}_{config['dataset']}_{attr.name}_img{index}_{layer_name}.png"
+                        )
                         plt.close()
                     layer_attributions.append(attr_map)
 
@@ -779,44 +692,46 @@ for index in tqdm(INDICES):
                             #     ("Normal", attr_map, IdentityMix()),
                             #     ("Mixed", mixed_map, mix),
                             # ]:
-                                result = metric(
-                                    model=model,
-                                    test_images=images,
-                                    saliency_maps=mixed_map,
-                                    class_idx=labels,
-                                    attribution_method=attr,
-                                    device=device,
-                                    layer=layer,
-                                    upsample_method=upsampler,
-                                    mixer=mixing_method,
-                                    previous_attributions=layer_attributions[:-1],
-                                    mask=mask,
-                                    reshape_transform=reshape,
-                                    explainer=attr,
-                                    test_dataset=funnybirds_test_dataset,
-                                )
-                                if isinstance(result, torch.Tensor):
-                                    result = result.item()
+                            result = metric(
+                                model=model,
+                                test_images=images,
+                                saliency_maps=mixed_map,
+                                class_idx=labels,
+                                attribution_method=attr,
+                                device=device,
+                                layer=layer,
+                                upsample_method=upsampler,
+                                mixer=mixing_method,
+                                previous_attributions=layer_attributions[:-1],
+                                mask=mask,
+                                reshape_transform=reshape,
+                                explainer=attr,
+                                test_dataset=funnybirds_test_dataset,
+                            )
+                            if isinstance(result, torch.Tensor):
+                                result = result.item()
 
-                                results.add_result(
-                                    model=config["model"],
-                                    attribution_method=attr.name,
-                                    dataset=config["dataset"],
-                                    layer=layer_name,
-                                    metric=metric.name,
-                                    upscale_method=upsampler.name,
-                                    mixing_method=mixing_method.name,
-                                    value=result,
-                                    image_index=index,
-                                    label=labels[0].item(),
-                                    predicted_label=pred_label[0].item(),
-                                )
-                                logger.debug(
-                                    f"Recorded result: Index={index}, Layer={layer_name}, Attr={attr.name}, "
-                                    f"Metric={metric.name}, Mix={mixing_method.name}"
-                                )
+                            results.add_result(
+                                model=config["model"],
+                                attribution_method=attr.name,
+                                dataset=config["dataset"],
+                                layer=layer_name,
+                                metric=metric.name,
+                                upscale_method=upsampler.name,
+                                mixing_method=mixing_method.name,
+                                value=result,
+                                image_index=index,
+                                label=labels[0].item(),
+                                predicted_label=pred_label[0].item(),
+                            )
+                            logger.debug(
+                                f"Recorded result: Index={index}, Layer={layer_name}, Attr={attr.name}, "
+                                f"Metric={metric.name}, Mix={mixing_method.name}"
+                            )
         except Exception as e:
-            logger.error(f"Error processing index {index}: {e}, for method {attr}", exc_info=True)
+            logger.error(
+                f"Error processing index {index}: {e}, for method {attr}", exc_info=True
+            )
 
 results.save_results()
 logger.info("Results saved successfully.")
