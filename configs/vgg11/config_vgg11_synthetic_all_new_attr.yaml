@@ -1,5 +1,4 @@
 model: vgg11
-# dataset: imagenettewoof
 dataset: synthetic_all
 attribution_methods:
   # - GradCAMPlusPlus
@@ -43,4 +42,3 @@ output_path: ./results_vgg11_synth_all.csv
 device: cuda:0
 # num_samples: 1
 only_final_layer: True
-

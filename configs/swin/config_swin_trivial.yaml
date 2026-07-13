@@ -1,5 +1,4 @@
 model: swin
-# dataset: imagenettewoof
 dataset: synthetic
 # dataset: imagenet
 attribution_methods:

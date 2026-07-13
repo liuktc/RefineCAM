@@ -1,5 +1,4 @@
 model: resnet18
-# dataset: imagenettewoof
 dataset: synthetic
 attribution_methods:
   - GradCAMPlusPlus

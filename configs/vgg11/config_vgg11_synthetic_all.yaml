@@ -1,5 +1,4 @@
 model: vgg11
-# dataset: imagenettewoof
 dataset: synthetic_all
 # dataset: imagenet
 attribution_methods:
