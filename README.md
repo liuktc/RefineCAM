@@ -46,7 +46,7 @@ This work addresses two complementary problems in the evaluation and refinement 
 * **ARCC** is a composite metric designed for more reliable evaluation of CAM explanations.
 * **Synthetic CAM Benchmark** provides ground-truth attributions for systematically evaluating explanation metrics.
 
-### RefineCAM and ARCC in `pytorch-grad-cam`
+## Installation
 
 Implementations of both **RefineCAM** and **ARCC** are integrated into the widely used [`pytorch-grad-cam`](https://github.com/jacobgil/pytorch-grad-cam) library.
 
@@ -68,9 +68,57 @@ from pytorch_grad_cam.metrics.ARCC import ARCC
 
 For the maintained implementation and usage documentation, see [`pytorch-grad-cam`](https://github.com/jacobgil/pytorch-grad-cam).
 
+## Example Usage
+
+```python
+from pytorch_grad_cam import GradCAMPlusPlus, RefineCAM
+from pytorch_grad_cam.metrics.arcc import ARCC
+
+# Load model and input image
+model = ...
+input_tensor = ...
+target = ...
+
+# Standard CAM
+gradcam = GradCAMPlusPlus(
+    model=model,
+    target_layers=[model.layer4[-1]],
+)
+gradcam_result = gradcam(input_tensor, targets=target)
+
+# RefineCAM combines CAMs from multiple layers
+refinecam = RefineCAM(
+    model=model,
+    target_layers=[
+        model.layer1[-1],
+        model.layer2[-1],
+        model.layer3[-1],
+        model.layer4[-1],
+    ],
+)
+refinecam_result = refinecam(input_tensor, targets=target)
+
+# Evaluate both explanations with ARCC
+gradcam_score = ARCC(base_method=gradcam)(
+    input_tensor, gradcam_result, targets=target, model=model
+)
+
+refinecam_score = ARCC(base_method=refinecam)(
+    input_tensor, refinecam_result, targets=target, model=model
+)
+```
+See [`example.py`](./example.py) for a complete runnable example with ResNet18, image loading, visualization, and ARCC evaluation. Running [`example.py`](./example.py) will produce this:
+
+<p align="center">
+  <img src="./example.png"
+       alt="Comparison of GradCAM++ vs RefineCAM evaluated with ARCC"
+       width="100%">
+</p>
+
 ## Paper
 
 **How to Evaluate and Refine Your CAM**
+
 Luca Domeniconi, Alessandra Stramiglio, Michele Lombardi, Samuele Salti
 
 [Project Website](https://refinecam.github.io) ·
@@ -78,19 +126,18 @@ Luca Domeniconi, Alessandra Stramiglio, Michele Lombardi, Samuele Salti
 [PDF](https://arxiv.org/pdf/2605.14641.pdf) ·
 [pytorch-grad-cam](https://github.com/jacobgil/pytorch-grad-cam)
 
-## Reproducibility
-
-This work received the **ICPR 2026 Reproducible Research in Pattern Recognition (RRPR) Badge** following an independent reproducibility evaluation.
 
 ## Citation
 
 If you use **RefineCAM**, **ARCC**, or the **synthetic benchmark**, please cite:
 
 ```bibtex id="h5179m"
-@misc{2605.14641,
-      Author = {Luca Domeniconi and Alessandra Stramiglio and Michele Lombardi and Samuele Salti},
-      Title = {How to Evaluate and Refine your CAM},
-      Year = {2026},
-      Eprint = {arXiv:2605.14641},
+@inproceedings{domeniconi2026evaluate,
+  title={How to Evaluate and Refine your CAM},
+  author={Domeniconi, Luca and Stramiglio, Alessandra and Lombardi, Michele and Salti, Samuele},
+  booktitle={International Conference on Pattern Recognition},
+  pages={543--557},
+  year={2026},
+  organization={Springer}
 }
 ```
