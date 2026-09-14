@@ -1,117 +1,92 @@
-# How to Evaluate and Refine your CAM
+<p align="center">
+  <a href="https://icpr2026.org/">
+    <img src="https://icpr2026.org/Logos/icpr26Logo.svg" alt="ICPR 2026" height="55">
+  </a>
+  &nbsp;&nbsp;&nbsp;
+  <a href="https://iapr-tc22-rrl.github.io/icpr2026/results/">
+    <img src="https://iapr-tc22-rrl.github.io/assets/logoTC22.png" alt="IAPR TC22 Reproducibility" height="55">
+  </a>
+</p>
 
-This repository contains the code, datasets, and resources associated with the paper "How to Evaluate and Refine your CAM"
+<h1 align="center">How to Evaluate and Refine your CAM</h1>
 
-## Overview
+<p align="center">
+  <b>Faithful CAM evaluation, a ground-truth benchmark, and high-resolution attribution maps.</b>
+</p>
 
-![Cover showing the effectiveness of RefineCAM](./cover.png)
+<p align="center">
+  <a href="https://arxiv.org/abs/2605.14641">
+    <img src="https://img.shields.io/badge/arXiv-2605.14641-B31B1B?style=for-the-badge&logo=arxiv&logoColor=white" alt="arXiv">
+  </a>
+  <a href="https://refinecam.github.io">
+    <img src="https://img.shields.io/badge/Project-Website-6C63FF?style=for-the-badge" alt="Project Website">
+  </a>
+  <a href="https://iapr-tc22-rrl.github.io/icpr2026/results/">
+    <img src="https://img.shields.io/badge/RRPR-Reproducibility%20Badge-18A558?style=for-the-badge" alt="Reproducibility Badge">
+  </a>
+</p>
 
-> Class attribution maps (CAMs) provide local explanations for the decisions of convolutional neural networks. While widely used in practice, the evaluation of CAMs remains challenging due to the lack of ground-truth explanations, making it difficult to evaluate the soundness of existing metrics. Independently, most commonly used CAM methods produce low-resolution attribution maps, which limits their usefulness for detailed interpretability.
-> To address the evaluation challenge, we introduce a synthetic dataset with ground-truth attributions that enables a rigorous comparison of CAM evaluation metrics. Using this dataset, we analyze existing metrics and propose ARCC, a new composite metric that more reliably identifies faithful explanations. To address the low resolution issue, we introduce RefineCAM, a method that produces high-resolution attribution maps by aggregating CAMs across multiple network layers. Our results show that RefineCAM consistently outperforms existing methods according to the proposed evaluation.
+<p align="center">
+  <img src="./cover.png"
+       alt="Overview of RefineCAM and CAM evaluation"
+       width="100%">
+</p>
+
+<p align="center">
+  <i>RefineCAM produces fine-grained attribution maps by combining information across multiple network layers.</i>
+</p>
+
+---
+
+## Highlights
+
+This work addresses two complementary problems in the evaluation and refinement of Class Attribution Maps (CAMs):
+
+* **RefineCAM** combines CAMs across multiple network layers to produce higher-resolution and better-focused attribution maps.
+* **ARCC** is a composite metric designed for more reliable evaluation of CAM explanations.
+* **Synthetic CAM Benchmark** provides ground-truth attributions for systematically evaluating explanation metrics.
+
+### RefineCAM and ARCC in `pytorch-grad-cam`
+
+Implementations of both **RefineCAM** and **ARCC** are integrated into the widely used [`pytorch-grad-cam`](https://github.com/jacobgil/pytorch-grad-cam) library.
+
+```bash id="3h7dz2"
+pip install grad-cam
+```
+
+RefineCAM can be imported directly with:
+
+```python id="4d6kom"
+from pytorch_grad_cam import RefineCAM
+```
+
+ARCC is available as an evaluation metric:
+
+```python id="a499y9"
+from pytorch_grad_cam.metrics.ARCC import ARCC
+```
+
+For the maintained implementation and usage documentation, see [`pytorch-grad-cam`](https://github.com/jacobgil/pytorch-grad-cam).
 
 ## Paper
 
-How to Evaluate and Refine Your CAM:
+**How to Evaluate and Refine Your CAM**
+Luca Domeniconi, Alessandra Stramiglio, Michele Lombardi, Samuele Salti
 
-- arXiv: https://arxiv.org/abs/2605.14641
-- PDF: https://arxiv.org/pdf/2605.14641.pdf
+[Project Website](https://refinecam.github.io) ·
+[arXiv](https://arxiv.org/abs/2605.14641) ·
+[PDF](https://arxiv.org/pdf/2605.14641.pdf) ·
+[pytorch-grad-cam](https://github.com/jacobgil/pytorch-grad-cam)
 
-If you find this work useful, please consider [citing it](#license).
+## Reproducibility
 
-## Installation
+This work received the **ICPR 2026 Reproducible Research in Pattern Recognition (RRPR) Badge** following an independent reproducibility evaluation.
 
-### Python venv
+## Citation
 
-1) Clone the repository:
+If you use **RefineCAM**, **ARCC**, or the **synthetic benchmark**, please cite:
 
-```bash
-git clone https://github.com/liuktc/RefineCAM.git
-cd RefineCAM
-```
-
-2) Create a virtual environment (recommended):
-
-```bash
-python -m venv venv
-source venv/bin/activate
-```
-
-3) Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-### Conda env
-
-1) Clone the repository:
-
-```bash
-git clone https://github.com/liuktc/RefineCAM.git
-cd RefineCAM
-```
-
-2) Create a conda environment:
-
-```bash
-conda env create -f environment.yml
-```
-
-3) Activate the environment:
-
-```bash
-conda activate myenv
-```
-
-## Datasets
-
-To run the experiments you first need to download the datasets that you want to evaluate on. For each dataset you have to do the following steps:
-- ImageNet: Download the ImageNet dataset from [https://image-net.org/download.php] and set the path to the dataset in the environment variable `IMAGENET_ROOT` (see below for details).
-- FunnyBirds: Download the FunnyBirds dataset from [https://github.com/visinf/funnybirds-framework] and set the path to the dataset in the environment variable `FUNNYBIRDS_ROOT` (see below for details).
-- Synthetic dataset: All the needed images are already included in the repository, so you don't need to download anything for this dataset.
-
-## Usage 
-
-To run experiments on a single model and dataset, execute the following command:
-
-```bash
-python run_experiments.py --config_file ./configs/config.yaml
-```
-
-If you want to run experiments on different models or datasets, you can modify the config file to specify the desired models and datasets (see folder `configs` for more examples).
-
-## Model Fine-tuning
-
-If you want to execute the script `run_experiments.py` with the synthetic dataset, you need to first fine-tune the model on the synthetic dataset. You can do this by running the following command:
-
-```bash
-python fine_tune.py --model vgg11
-```
-
-You can replace `vgg11` with any supported model that you want to fine-tune. 
-
-## Environment Variables
-
-The following environment variables can be set to override default paths:
-
-- `IMAGENET_ROOT`: Path to ImageNet dataset (default: "./data/imagenet")
-- `FUNNYBIRDS_ROOT`: Path to FunnyBirds dataset (default: "./data/funnybirds/FunnyBirds")
-
-Example usage:
-```bash
-export IMAGENET_ROOT="/path/to/imagenet"
-export FUNNYBIRDS_ROOT="/path/to/funnybirds"
-python run_experiments.py --config_file ./configs/config.yaml
-```
-
-
-## License
-
-This project is licensed under the MIT License – see the [LICENSE](https://github.com/liuktc/RefineCAM/blob/master/LICENSE) file for details.
-
-You are free to use, modify, and distribute this code. If you use it for research, please cite the original paper using the following BibTeX entry:
-
-```bibtex
+```bibtex id="h5179m"
 @misc{2605.14641,
       Author = {Luca Domeniconi and Alessandra Stramiglio and Michele Lombardi and Samuele Salti},
       Title = {How to Evaluate and Refine your CAM},
